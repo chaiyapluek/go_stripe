@@ -1,0 +1,13 @@
+version: '3.8'
+services:
+  mariaDB:
+    image: mariadb
+    restart: on-failure
+    environment:
+      - ./env/maria.env
+    volumes:
+      - mariaDBData:/var/lib/mysql
+    ports:
+      - 4002:3306
+volumes:
+  mariaDBData:

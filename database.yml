@@ -1,0 +1,8 @@
+development:
+  dialect: mysql
+  database: widgets
+  user: plub
+  password: 1234
+  host: 127.0.0.1
+  port: 4002
+  pool: 5
