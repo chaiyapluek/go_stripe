@@ -28,11 +28,27 @@ func (app *application) VirtualTerminal(w http.ResponseWriter, r *http.Request) 
 	}
 }
 
-func (app *application) PaymentSucceeded(w http.ResponseWriter, r *http.Request) {
+type TransactionData struct {
+	FirstName       string
+	LastName        string
+	Email           string
+	PaymentIntentID string
+	PaymentMethodID string
+	PaymentAmount   int
+	PaymentCurrency string
+	LastFour        string
+	ExpiryMonth     int
+	ExpiryYear      int
+	BankReturnCode  string
+}
+
+// Get transaction data from post and stripe
+func (app *application) GetTransactionData(r *http.Request) (TransactionData, error) {
+	var txnData TransactionData
 	err := r.ParseForm()
 	if err != nil {
 		app.errorLog.Println(err)
-		return
+		return txnData, err
 	}
 
 	// read posted data
@@ -43,6 +59,11 @@ func (app *application) PaymentSucceeded(w http.ResponseWriter, r *http.Request)
 	paymentMethod := r.Form.Get("payment_method")
 	paymentAmount := r.Form.Get("payment_amount")
 	paymentCurrency := r.Form.Get("payment_currency")
+	amount, err := strconv.Atoi(paymentAmount)
+	if err != nil {
+		app.errorLog.Println("Cannot convert payment amount:", err)
+		return txnData, err
+	}
 
 	card := cards.Card{
 		Secret: app.config.stripe.secret,
@@ -55,21 +76,52 @@ func (app *application) PaymentSucceeded(w http.ResponseWriter, r *http.Request)
 	pi, err := card.RetrievePaymentIntent(paymentIntent)
 	if err != nil {
 		app.errorLog.Println(err)
-		return
+		return txnData, err
 	}
 
 	pm, err := card.GetPaymentMethod(paymentMethod)
 	if err != nil {
 		app.errorLog.Println(err)
-		return
+		return txnData, err
 	}
 
 	last4 := pm.Card.Last4
 	expiryMonth := pm.Card.ExpMonth
 	expiryYear := pm.Card.ExpYear
 
+	txnData = TransactionData{
+		FirstName:       first_name,
+		LastName:        last_name,
+		Email:           email,
+		PaymentIntentID: paymentIntent,
+		PaymentMethodID: paymentMethod,
+		PaymentAmount:   amount,
+		PaymentCurrency: paymentCurrency,
+		LastFour:        last4,
+		ExpiryMonth:     int(expiryMonth),
+		ExpiryYear:      int(expiryYear),
+		BankReturnCode:  pi.Charges.Data[0].ID,
+	}
+
+	return txnData, nil
+}
+
+func (app *application) PaymentSucceeded(w http.ResponseWriter, r *http.Request) {
+
+	txnData, err := app.GetTransactionData(r)
+	if err != nil {
+		app.errorLog.Println("Cannot get transaction data:", err)
+		return
+	}
+
+	widgetID, err := strconv.Atoi(r.Form.Get("product_id"))
+	if err != nil {
+		app.errorLog.Println("Cannot convert product id:", err)
+		return
+	}
+
 	// Create a new Customer
-	customerID, err := app.SaveCustomer(first_name, last_name, email)
+	customerID, err := app.SaveCustomer(txnData.FirstName, txnData.LastName, txnData.Email)
 	if err != nil {
 		app.errorLog.Println("Failed to save customer:", err)
 		return
@@ -77,19 +129,16 @@ func (app *application) PaymentSucceeded(w http.ResponseWriter, r *http.Request)
 	app.infoLog.Println("CustomerID:", customerID)
 
 	// Create a new transaction
-	amount, err := strconv.Atoi(paymentAmount)
-	if err != nil {
-		app.errorLog.Println("Cannot convert payment amount:", err)
-		return
-	}
 	txn := models.Transaction{
-		Amount:              amount,
-		Currency:            paymentCurrency,
-		LastFour:            last4,
-		ExpiryMonth:         int(expiryMonth),
-		ExpiryYear:          int(expiryYear),
-		BankReturnCode:      pi.Charges.Data[0].ID,
+		Amount:              txnData.PaymentAmount,
+		Currency:            txnData.PaymentCurrency,
+		LastFour:            txnData.LastFour,
+		ExpiryMonth:         int(txnData.ExpiryMonth),
+		ExpiryYear:          int(txnData.ExpiryYear),
+		BankReturnCode:      txnData.BankReturnCode,
 		TransactionStatusID: 2,
+		PaymentIntent:       txnData.PaymentIntentID,
+		PaymentMethod:       txnData.PaymentMethodID,
 	}
 	txnID, err := app.SaveTransaction(txn)
 	if err != nil {
@@ -99,18 +148,14 @@ func (app *application) PaymentSucceeded(w http.ResponseWriter, r *http.Request)
 	app.infoLog.Println("TransactionID:", txnID)
 
 	// Create a new order
-	widgetID, err := strconv.Atoi(r.Form.Get("product_id"))
-	if err != nil {
-		app.errorLog.Println("Cannot convert product id:", err)
-		return
-	}
+
 	order := models.Order{
 		WidgetID:      widgetID,
 		TransactionID: txnID,
 		CustomerID:    customerID,
 		StatusID:      1,
 		Quantity:      1,
-		Amount:        amount,
+		Amount:        txnData.PaymentAmount,
 		CreateAt:      time.Now(),
 		UpdateAt:      time.Now(),
 	}
@@ -120,23 +165,70 @@ func (app *application) PaymentSucceeded(w http.ResponseWriter, r *http.Request)
 		return
 	}
 
-	data := make(map[string]interface{})
-	data["first_name"] = first_name
-	data["last_name"] = last_name
-	data["email"] = email
-	data["pi"] = paymentIntent
-	data["pm"] = paymentMethod
-	data["pa"] = paymentAmount
-	data["pc"] = paymentCurrency
-	data["last_four"] = last4
-	data["expiry_month"] = expiryMonth
-	data["expiry_year"] = expiryYear
-	data["bank_return_code"] = pi.Charges.Data[0].ID
+	//write this data to session, and then redirect user to new page
+	app.Session.Put(r.Context(), "receipt", txnData)
+	http.Redirect(w, r, "/receipt", http.StatusSeeOther)
 
-	if err := app.renderTemplate(w, r, "succeeded", &templateData{
+}
+
+// virtual terminal payment succeeded display the receipt page for virtual terminal transaction
+func (app *application) VirtualTerminalPaymentSucceeded(w http.ResponseWriter, r *http.Request) {
+
+	txnData, err := app.GetTransactionData(r)
+	if err != nil {
+		app.errorLog.Println("Cannot get transaction data:", err)
+		return
+	}
+
+	// Create a new transaction
+	txn := models.Transaction{
+		Amount:              txnData.PaymentAmount,
+		Currency:            txnData.PaymentCurrency,
+		LastFour:            txnData.LastFour,
+		ExpiryMonth:         int(txnData.ExpiryMonth),
+		ExpiryYear:          int(txnData.ExpiryYear),
+		BankReturnCode:      txnData.BankReturnCode,
+		TransactionStatusID: 2,
+		PaymentIntent:       txnData.PaymentIntentID,
+		PaymentMethod:       txnData.PaymentMethodID,
+	}
+	txnID, err := app.SaveTransaction(txn)
+	if err != nil {
+		app.errorLog.Println("Failed to save transaction:", err)
+		return
+	}
+	app.infoLog.Println("TransactionID:", txnID)
+
+	//write this data to session, and then redirect user to new page
+	app.Session.Put(r.Context(), "receipt", txnData)
+	http.Redirect(w, r, "/virtual-terminal-receipt", http.StatusSeeOther)
+
+}
+
+func (app *application) Receipt(w http.ResponseWriter, r *http.Request) {
+	txn := app.Session.Get(r.Context(), "receipt").(TransactionData)
+	data := make(map[string]interface{})
+	data["txn"] = txn
+	app.Session.Remove(r.Context(), "receipt")
+	err := app.renderTemplate(w, r, "receipt", &templateData{
 		Data: data,
-	}); err != nil {
-		app.errorLog.Println(err)
+	})
+	if err != nil {
+		app.errorLog.Println("Cannot render receipt:", err)
+	}
+
+}
+
+func (app *application) VirtualTerminalReceipt(w http.ResponseWriter, r *http.Request) {
+	txn := app.Session.Get(r.Context(), "receipt").(TransactionData)
+	data := make(map[string]interface{})
+	data["txn"] = txn
+	app.Session.Remove(r.Context(), "receipt")
+	err := app.renderTemplate(w, r, "virtual-terminal-receipt", &templateData{
+		Data: data,
+	})
+	if err != nil {
+		app.errorLog.Println("Cannot render receipt:", err)
 	}
 
 }
@@ -192,5 +284,22 @@ func (app *application) ChargeOnce(w http.ResponseWriter, r *http.Request) {
 		Data: data,
 	}, "stripe-js"); err != nil {
 		app.errorLog.Println(err)
+	}
+}
+
+func (app *application) BronzePlan(w http.ResponseWriter, r *http.Request) {
+	widget, err := app.DB.GetWidget(2)
+	if err != nil {
+		app.errorLog.Println("Cannot get bronze plan from db", err)
+		return
+	}
+
+	data := make(map[string]interface{})
+	data["widget"] = widget
+
+	if err := app.renderTemplate(w, r, "bronze-plan", &templateData{
+		Data: data,
+	}); err != nil {
+		app.errorLog.Println("Cannot render bronze-plan", err)
 	}
 }

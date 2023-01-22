@@ -10,7 +10,7 @@
 
     <div class="alert alert-danger text-center d-none" id="card-message"></div>
 
-    <form action="/payment-succeeded" method="post" name="charge_form" id="charge_form" autocomplete="off" 
+    <form action="/virtual-terminal-payment-succeeded" method="post" name="charge_form" id="charge_form" autocomplete="off" 
         class="d-block needs-validation charge-form" novalidate="">
 
         <div class="mb-3">
@@ -60,7 +60,7 @@
 <script>
 document.getElementById("charge_amount").addEventListener("change", function(event){
     if(event.target.value !== ""){
-        document.getElementById("amount").value = event.target.value * 100
+        document.getElementById("amount").value = parseInt((event.target.value * 100), 10)
     }else{
         document.getElementById("amount").value = 0
     }

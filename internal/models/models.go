@@ -33,6 +33,8 @@ type Widget struct {
 	InventoryLevel int       `json:"inventory_level"`
 	Price          int       `json:"price"`
 	Image          string    `json:"image"`
+	IsRecurring    bool      `json:"is_recurring"`
+	PlanID         string    `json:"plan_id"`
 	CreateAt       time.Time `json:"-"`
 	UpdateAt       time.Time `json:"-"`
 }
@@ -74,6 +76,8 @@ type Transaction struct {
 	LastFour            string    `json:"last_four"`
 	ExpiryMonth         int       `json:"expiry_month"`
 	ExpiryYear          int       `json:"expiry_year"`
+	PaymentIntent       string    `json:"payment_intent"`
+	PaymentMethod       string    `json:"payment_method"`
 	BankReturnCode      string    `json:"bank_return_code"`
 	TransactionStatusID int       `json:"transaction_status_id"`
 	CreateAt            time.Time `json:"-"`
@@ -107,7 +111,8 @@ func (m *DBModel) GetWidget(id int) (Widget, error) {
 	var widget Widget
 
 	row := m.DB.QueryRowContext(ctx, `
-		SELECT id, name, description, inventory_level, price, COALESCE(image, ""), created_at, updated_at 
+		SELECT id, name, description, inventory_level, price, COALESCE(image, "")
+			,created_at, updated_at, is_recurring, plan_id 
 		FROM widgets 
 		WHERE id=?`, id)
 	err := row.Scan(
@@ -119,6 +124,8 @@ func (m *DBModel) GetWidget(id int) (Widget, error) {
 		&widget.Image,
 		&widget.CreateAt,
 		&widget.UpdateAt,
+		&widget.IsRecurring,
+		&widget.PlanID,
 	)
 	if err != nil {
 		return widget, err
@@ -133,8 +140,9 @@ func (m *DBModel) InsertTransaction(txn Transaction) (int, error) {
 
 	stmt := `
 	INSERT INTO transactions
-		(amount, currency, last_four, bank_return_code, transaction_status_id,created_at, updated_at, expiry_month, expiry_year)
-		VALUES (?,?,?,?,?,?,?,?,?)
+		(amount, currency, last_four, bank_return_code, transaction_status_id, created_at, 
+			updated_at, expiry_month, expiry_year, payment_intent, payment_method)
+		VALUES (?,?,?,?,?,?,?,?,?,?,?)
 	`
 	result, err := m.DB.ExecContext(ctx, stmt,
 		txn.Amount,
@@ -146,6 +154,8 @@ func (m *DBModel) InsertTransaction(txn Transaction) (int, error) {
 		time.Now(),
 		txn.ExpiryMonth,
 		txn.ExpiryYear,
+		txn.PaymentIntent,
+		txn.PaymentMethod,
 	)
 	if err != nil {
 		return 0, err
