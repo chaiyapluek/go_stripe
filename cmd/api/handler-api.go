@@ -27,7 +27,7 @@ func (app *application) GetPaymentIntent(w http.ResponseWriter, r *http.Request)
 
 	err := json.NewDecoder(r.Body).Decode(&payload)
 	if err != nil {
-		app.errorLog.Println(err)
+		app.errorLog.Println((*r).Body, err)
 		return
 	}
 

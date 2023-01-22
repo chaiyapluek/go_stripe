@@ -1,0 +1,1 @@
+drop_columns("orders", "customer_id")

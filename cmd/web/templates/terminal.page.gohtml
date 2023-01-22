@@ -14,8 +14,8 @@
         class="d-block needs-validation charge-form" novalidate="">
 
         <div class="mb-3">
-            <label for="amount" class="form-label">Amount</label>
-            <input type="text" class="form-control" id="amount" name="amount" required="" autocomplete="amount-new">
+            <label for="charge_amount" class="form-label">Amount</label>
+            <input type="text" class="form-control" id="charge_amount" required="" autocomplete="charge_amount-new">
         </div>
 
         <div class="mb-3">
@@ -47,6 +47,7 @@
             </div>
         </div>
 
+        <input type="hidden" name="amount" id="amount">
         <input type="hidden" name="payment_intent" id="payment_intent">
         <input type="hidden" name="payment_method" id="payment_method">
         <input type="hidden" name="payment_amount" id="payment_amount">
@@ -56,5 +57,14 @@
 {{end}}
 
 {{define "js"}}
+<script>
+document.getElementById("charge_amount").addEventListener("change", function(event){
+    if(event.target.value !== ""){
+        document.getElementById("amount").value = event.target.value * 100
+    }else{
+        document.getElementById("amount").value = 0
+    }
+})
+</script>
 {{template "stripe-js" .}}
 {{end}}
