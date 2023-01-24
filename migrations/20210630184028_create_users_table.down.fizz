@@ -1,1 +1,1 @@
-drop_table("users")
+sql("drop table if exists users;")

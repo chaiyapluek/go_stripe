@@ -1,4 +1,5 @@
-add_column("orders", "customer_id", "integer", {"unsigned": true})
+sql("ALTER TABLE orders
+ADD COLUMN IF NOT EXISTS customer_id INT UNSIGNED;")
 
 add_foreign_key("orders", "customer_id", {"customers": ["id"]}, {
     "on_delete": "cascade",

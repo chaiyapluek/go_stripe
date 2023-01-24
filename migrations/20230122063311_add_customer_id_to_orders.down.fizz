@@ -1,1 +1,2 @@
-drop_columns("orders", "customer_id")
+sql("alter table orders drop constraint orders_customers_id_fk;")
+drop_column("orders", "customer_id")

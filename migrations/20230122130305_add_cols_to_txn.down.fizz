@@ -1,2 +1,2 @@
-drop_column("transaction", "payment_intent")
-drop_column("transaction", "payment_method")
+drop_column("transactions", "payment_intent")
+drop_column("transactions", "payment_method")

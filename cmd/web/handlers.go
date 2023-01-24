@@ -220,7 +220,11 @@ func (app *application) Receipt(w http.ResponseWriter, r *http.Request) {
 }
 
 func (app *application) VirtualTerminalReceipt(w http.ResponseWriter, r *http.Request) {
-	txn := app.Session.Get(r.Context(), "receipt").(TransactionData)
+	txn, ok := app.Session.Get(r.Context(), "receipt").(TransactionData)
+	if !ok {
+		app.errorLog.Println("Type assertion to TransactionData failed")
+		return
+	}
 	data := make(map[string]interface{})
 	data["txn"] = txn
 	app.Session.Remove(r.Context(), "receipt")
@@ -301,5 +305,18 @@ func (app *application) BronzePlan(w http.ResponseWriter, r *http.Request) {
 		Data: data,
 	}); err != nil {
 		app.errorLog.Println("Cannot render bronze-plan", err)
+	}
+}
+
+func (app *application) BronzePlanReceipt(w http.ResponseWriter, r *http.Request) {
+
+	if err := app.renderTemplate(w, r, "receipt-plan", &templateData{}); err != nil {
+		app.errorLog.Println("Cannot render receipt-plan", err)
+	}
+}
+
+func (app *application) LoginPage(w http.ResponseWriter, r *http.Request) {
+	if err := app.renderTemplate(w, r, "login", &templateData{}); err != nil {
+		app.errorLog.Println("Cannot render login page", err)
 	}
 }
