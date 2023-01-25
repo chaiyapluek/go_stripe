@@ -5,36 +5,41 @@
 {{end}}
 
 {{define "content"}}
-    <h2 class="mt-3">Login</h2>
-    <hr>
+
+    <div class="row">
+        <div class="col-md-6 offset-md-3">
+            <h2 class="mt-3">Login</h2>
+            <hr>
+            
+            <div class="alert alert-danger text-center d-none" id="login-message"></div>
+
+            <form action="/login" method="post" name="login_form" id="login-form" autocomplete="off" 
+                class="d-block needs-validation charge-form" novalidate="">
+
+                <div class="mb-3">
+                    <label for="email" class="form-label">Email</label>
+                    <input type="email" class="form-control" id="email" name="email" required 
+                        autocomplete="email-new">
+                </div>
+
+                <div class="mb-3">
+                    <label for="password" class="form-label">Password</label>
+                    <input type="password" class="form-control" id="password" name="password" required 
+                        autocomplete="password-new">
+                </div>
+
+                <hr>
+
+                <a href="javascript:void(0)" class="btn btn-primary" onclick="val(event)">Login</a>
+
+                <p class="mt-2">
+                    <small><a href="/forgot-password">Forgot password</a>
+                </p>
+
+            </form>
+        </div>
+    </div>
     
-    <div class="alert alert-danger text-center d-none" id="login-message"></div>
-
-    <form action="/" method="post" name="login_form" id="login-form" autocomplete="off" 
-        class="d-block needs-validation charge-form" novalidate="">
-
-        <div class="mb-3">
-            <label for="email" class="form-label">Email</label>
-            <input type="email" class="form-control" id="email" name="email" required 
-                autocomplete="email-new">
-        </div>
-
-        <div class="mb-3">
-            <label for="password" class="form-label">Email</label>
-            <input type="password" class="form-control" id="password" name="password" required 
-                autocomplete="password-new">
-        </div>
-
-        <hr>
-
-        <a href="javascript:void(0)" class="btn btn-primary" onclick="val(event)">Login</a>
-        <div id="processing-payment" class="d-none text-center">
-            <div class="spinner-border text-primary" role="status">
-                <span class="visually-hidden">Loading...</span>
-            </div>
-        </div>
-
-    </form>
 {{end}}
 
 {{define "js"}}
@@ -92,7 +97,8 @@ function val(event){
             localStorage.setItem("token_expiry", data.authentication_token.expiry)
             showCardSuccess()
             setTimeout(()=>{
-                location.href = "/"
+                //location.href = "/"
+                document.getElementById("login-form").submit()
             }, 500)
         }
     })
