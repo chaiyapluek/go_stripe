@@ -30,6 +30,8 @@ type config struct {
 		username string
 		password string
 	}
+	secretKey string
+	frontend  string
 }
 
 type application struct {
@@ -64,6 +66,8 @@ func main() {
 	flag.StringVar(&cfg.smtp.username, "smtpusername", "bc28ea07c4fdc6", "smtp username")
 	flag.StringVar(&cfg.smtp.password, "smtppassword", "7c313ea8d7241b", "smtp password")
 	flag.IntVar(&cfg.smtp.port, "smtpport", 587, "smtp port")
+	flag.StringVar(&cfg.secretKey, "secretkey", "RSdhuQeSYCVle7rI7zgVlcY9lMUsC07X", "secret key")
+	flag.StringVar(&cfg.frontend, "frontend", "http://localhost:4000", "frontend url")
 
 	flag.Parse()
 
